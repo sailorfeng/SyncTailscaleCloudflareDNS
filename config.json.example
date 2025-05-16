@@ -1,0 +1,15 @@
+{
+  "tailscale": {
+    "comment": "No API token is needed when using the Tailscale CLI. This section is kept for backward compatibility."
+  },
+  "cloudflare": {
+    "api_token": "your-cloudflare-api-token",
+    "zone_id": "your-cloudflare-zone-id",
+    "domain": "example.com",
+    "subdomain_prefix": "ts"
+  },
+  "sync": {
+    "interval_seconds": 300,
+    "log_level": "INFO"
+  }
+}
