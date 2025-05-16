@@ -19,7 +19,7 @@
 
 ## Prerequisites
 
-*   Python 3.7+
+*   Python 3.8+ (recommended for best compatibility with uv)
 *   A Tailscale account with the Tailscale CLI installed and logged in on the device running this application.
 *   A Cloudflare account and an [API token](https://developers.cloudflare.com/api/tokens/create/).
     *   The token needs `Zone:Read` and `DNS:Edit` permissions for the specific zone you want to manage.
@@ -36,11 +36,29 @@
     ```
 
 2.  **Install dependencies:**
-    It's recommended to use a virtual environment.
+
+    **Option 1: Using uv (recommended):**
+    [uv](https://github.com/astral-sh/uv) is a faster alternative to pip for Python package management.
+
+    ```bash
+    # Install uv if you haven't already
+    pip install uv
+
+    # Create and activate a virtual environment
+    uv venv
+    source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+
+    # Install the package in development mode with all dependencies
+    uv pip install -e ".[dev]"
+    ```
+
+    **Option 2: Using pip:**
     ```bash
     python -m venv venv
     source venv/bin/activate  # On Windows: venv\Scripts\activate
     pip install -r requirements.txt
+    # For development:
+    pip install -r requirements-dev.txt
     ```
 
 3.  **Configure the application:**
@@ -84,8 +102,15 @@
 
 ## Usage
 
-The application is run from the command line using `python src/sync.py`.
+The application can be run using the installed script or directly from the source:
 
+**If installed with uv or pip in development mode:**
+```bash
+# From anywhere in your activated virtual environment
+ts-cf-sync [OPTIONS]
+```
+
+**Or directly from the source:**
 ```bash
 python src/sync.py [OPTIONS]
 ```
@@ -99,6 +124,52 @@ python src/sync.py [OPTIONS]
 *   `--cleanup-records`: Remove all DNS 'A' records managed by this tool (matching `*.subdomain_prefix.domain`) from Cloudflare, then exit. Use with `--dry-run` to see what would be deleted.
 *   `--validate-config`: Validate the configuration settings and test API token connectivity to Tailscale and Cloudflare, then exit.
 *   `-h`, `--help`: Show the help message and exit.
+
+## Development with uv
+
+For development, uv provides a modern and fast workflow:
+
+1. **Setup your development environment:**
+   ```bash
+   # Install in development mode with dev dependencies
+   uv pip install -e ".[dev]"
+   ```
+
+2. **Run tests:**
+   ```bash
+   # Run tests with pytest
+   uv run pytest
+   ```
+
+3. **Linting:**
+   ```bash
+   # Install ruff if not already installed
+   uv pip install ruff
+
+   # Run linting
+   uv run ruff check .
+
+   # Automatically fix some issues
+   uv run ruff check --fix .
+   ```
+
+4. **Build the package:**
+   ```bash
+   uv pip install build
+   uv run python -m build
+   ```
+
+5. **Updating dependencies:**
+   ```bash
+   # Update all dependencies to their latest compatible versions
+   uv pip compile pyproject.toml -o requirements.txt
+   ```
+
+Using uv provides several advantages over traditional pip:
+- Much faster dependency resolution and installation
+- Better caching of wheels and build artifacts
+- Improved reproducibility with lockfiles
+- Compatibility with existing Python packaging tools and standards
 
 **Examples:**
 
