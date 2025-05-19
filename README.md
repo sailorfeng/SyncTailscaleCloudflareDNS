@@ -11,7 +11,6 @@
 *   **Comprehensive Logging**: Detailed logging of operations, errors, and warnings.
 *   **Command-Line Interface (CLI)**:
     *   **One-Time Sync**: Perform a single synchronization run.
-    *   **Watch Mode**: Periodically sync devices in the background.
     *   **List Devices**: Display current Tailscale devices and their details.
     *   **Cleanup Records**: Remove all DNS records managed by this tool from Cloudflare.
     *   **Validate Configuration**: Check `config.json` and connectivity.
@@ -118,7 +117,6 @@ python src/sync.py [OPTIONS]
 **Available Options:**
 
 *   `--config FILE_PATH`: Path to the configuration file (default: `config.json`).
-*   `--watch`: Run in watch mode, synchronizing periodically based on `interval_seconds` in the config.
 *   `--dry-run`: Perform a dry run. Simulates operations without making any changes to Cloudflare. Useful for testing.
 *   `--list-devices`: List current Tailscale devices and their details, then exit.
 *   `--cleanup-records`: Remove all DNS 'A' records managed by this tool (matching `*.subdomain_prefix.domain`) from Cloudflare, then exit. Use with `--dry-run` to see what would be deleted.
@@ -181,17 +179,6 @@ Using uv provides several advantages over traditional pip:
 2.  **Perform a dry run to see what changes would be made:**
     ```bash
     python src/sync.py --dry-run
-    ```
-
-3.  **Run in watch mode to sync every 5 minutes (default interval):**
-    ```bash
-    python src/sync.py --watch
-    ```
-
-4.  **Run in watch mode with a custom interval (e.g., every 10 minutes, configured in `config.json` or env var):**
-    First, set `interval_seconds`: 600 in `config.json` or `export SYNC_INTERVAL_SECONDS=600`.
-    ```bash
-    python src/sync.py --watch
     ```
 
 5.  **List your Tailscale devices:**

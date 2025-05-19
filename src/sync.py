@@ -2,22 +2,21 @@
 
 import argparse
 import logging
-import time
-import sys
 import os
-from typing import Dict, List, Any, Tuple
+import sys
+from typing import Any, Dict, List, Tuple
 
 # Ensure src directory is in path for direct execution and for imports if not installed
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 try:
-    from src.config import load_config, DEFAULT_CONFIG_PATH
-    from src.tailscale import TailscaleAPI
     from src.cloudflare import CloudflareAPI
+    from src.config import DEFAULT_CONFIG_PATH, load_config
+    from src.tailscale import TailscaleAPI
 except ImportError: # Fallback for when the package is installed
-    from config import load_config, DEFAULT_CONFIG_PATH
-    from tailscale import TailscaleAPI
     from cloudflare import CloudflareAPI
+    from config import DEFAULT_CONFIG_PATH, load_config
+    from tailscale import TailscaleAPI
 
 
 logger = logging.getLogger(__name__)
@@ -248,9 +247,6 @@ def main():
         "--config", default=DEFAULT_CONFIG_PATH, help=f"Path to configuration file (default: {DEFAULT_CONFIG_PATH})"
     )
     parser.add_argument(
-        "--watch", action="store_true", help="Run in watch mode, synchronizing periodically."
-    )
-    parser.add_argument(
         "--dry-run", action="store_true", help="Perform a dry run without making any changes to Cloudflare."
     )
     parser.add_argument(
@@ -304,24 +300,13 @@ def main():
         cleanup_cloudflare_records(cf_api, dry_run=args.dry_run)
         sys.exit(0)
 
-    if args.watch:
-        interval = config.get("sync", {}).get("interval_seconds", 300)
-        logger.info(f"Watch mode enabled. Synchronizing every {interval} seconds.")
-        while True:
-            try:
-                synchronize_dns(ts_api, cf_api, dry_run=args.dry_run)
-            except Exception as e: # Catch broad exceptions in the loop to prevent daemon crash
-                logger.error(f"Unhandled error during scheduled synchronization: {e}", exc_info=True)
-            logger.info(f"Next synchronization in {interval} seconds.")
-            time.sleep(interval)
-    else:
-        # Single run
-        try:
-            synchronize_dns(ts_api, cf_api, dry_run=args.dry_run)
-        except Exception as e:
-            logger.error(f"Unhandled error during synchronization: {e}", exc_info=True)
-            sys.exit(1)
-        logger.info("Synchronization complete.")
+    # Single run
+    try:
+        synchronize_dns(ts_api, cf_api, dry_run=args.dry_run)
+    except Exception as e:
+        logger.error(f"Unhandled error during synchronization: {e}", exc_info=True)
+        sys.exit(1)
+    logger.info("Synchronization complete.")
 
 if __name__ == "__main__":
     main()

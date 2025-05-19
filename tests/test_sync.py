@@ -1,25 +1,26 @@
 # Tests for sync.py
 
-import pytest
-from unittest.mock import MagicMock, patch, call
 import logging
-
+import os
 # Ensure src is in path for imports if tests are run from project root
 import sys
-import os
+from unittest.mock import MagicMock, call, patch
+
+import pytest
+
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 try:
     from src import sync
-    from src.tailscale import TailscaleAPI
     from src.cloudflare import CloudflareAPI
-    from src.config import load_config # For main args parsing
+    from src.config import load_config  # For main args parsing
+    from src.tailscale import TailscaleAPI
 except ImportError:
     # Fallback for when package might be installed or structure is different
     import sync
-    from tailscale import TailscaleAPI
     from cloudflare import CloudflareAPI
     from config import load_config
+    from tailscale import TailscaleAPI
 
 
 # --- Fixtures ---
@@ -53,9 +54,9 @@ def test_get_desired_dns_records_empty(mock_cf_api):
 def test_get_desired_dns_records_single_device(mock_cf_api):
     ts_devices = [{"name": "dev1", "ip": "100.1.1.1", "id": "tsid1"}]
     # mock_cf_api._get_record_name.return_value = "dev1.ts-test.example.com" # Already mocked by fixture setup
-    
+
     desired = sync.get_desired_dns_records(ts_devices, mock_cf_api)
-    
+
     expected_fqdn = "dev1.ts-test.example.com"
     assert expected_fqdn in desired
     assert desired[expected_fqdn]["ip"] == "100.1.1.1"
@@ -69,7 +70,7 @@ def test_get_desired_dns_records_filters_missing_ip_or_name(mock_cf_api, caplog)
         {"ip": "100.1.1.3", "id": "tsid4"}    # Missing name
     ]
     desired = sync.get_desired_dns_records(ts_devices, mock_cf_api)
-    
+
     assert len(desired) == 1
     assert "dev-ok.ts-test.example.com" in desired
     assert "Skipping Tailscale device due to missing name or IP" in caplog.text
@@ -90,9 +91,9 @@ def test_get_current_dns_records_multiple(mock_cf_api):
         {"id": "cfid3", "name": "ignored.ts-test.example.com", "content": "9.9.9.9", "type": "TXT"}, # Ignored type
     ]
     mock_cf_api.get_all_managed_records.return_value = raw_records
-    
+
     current = sync.get_current_dns_records(mock_cf_api)
-    
+
     assert len(current) == 2
     assert "rec1.ts-test.example.com" in current
     assert current["rec1.ts-test.example.com"]["id"] == "cfid1"
@@ -143,6 +144,7 @@ def test_synchronize_dns_delete_stale(mock_ts_api, mock_cf_api, caplog):
 
 # Scenario: No changes needed
 def test_synchronize_dns_no_changes(mock_ts_api, mock_cf_api, caplog):
+    caplog.set_level(logging.DEBUG)  # Set debug level for this test to capture debug logs
     fqdn = "samedev.ts-test.example.com"
     ip = "100.10.1.4"
     mock_ts_api.get_devices.return_value = [{"name": "samedev", "ip": ip, "id": "ts_same"}]
@@ -174,9 +176,9 @@ def test_synchronize_dns_dry_run(mock_ts_api, mock_cf_api, caplog):
 # Scenario: Error in Tailscale API
 def test_synchronize_dns_tailscale_api_error(mock_ts_api, mock_cf_api, caplog):
     mock_ts_api.get_devices.side_effect = ValueError("Tailscale auth failed")
-    
+
     sync.synchronize_dns(mock_ts_api, mock_cf_api)
-    
+
     assert "Failed to get devices from Tailscale: Tailscale auth failed" in caplog.text
     mock_cf_api.get_all_managed_records.assert_not_called() # Should not proceed
 
@@ -197,7 +199,7 @@ def test_synchronize_dns_cloudflare_action_error(mock_ts_api, mock_cf_api, caplo
     mock_cf_api.create_dns_record.side_effect = Exception("CF API create error")
 
     sync.synchronize_dns(mock_ts_api, mock_cf_api)
-    
+
     fqdn = "actionerrdev.ts-test.example.com"
     assert f"Failed to create DNS record for {fqdn}: CF API create error" in caplog.text
     assert "0 created, 0 updated, 0 deleted, 0 no change, 1 errors." in caplog.text
@@ -234,9 +236,9 @@ def test_cleanup_cloudflare_records_success(mock_cf_api, caplog):
         {"id": "cfid2", "name": "rec2.ts-test.example.com", "content": "5.6.7.8", "type": "A"},
     ]
     mock_cf_api.get_all_managed_records.return_value = records_to_delete
-    
+
     sync.cleanup_cloudflare_records(mock_cf_api, dry_run=False)
-    
+
     assert mock_cf_api.delete_dns_record.call_count == 2
     mock_cf_api.delete_dns_record.assert_any_call("cfid1")
     mock_cf_api.delete_dns_record.assert_any_call("cfid2")
@@ -245,9 +247,9 @@ def test_cleanup_cloudflare_records_success(mock_cf_api, caplog):
 def test_cleanup_cloudflare_records_dry_run(mock_cf_api, caplog):
     records_to_delete = [{"id": "cfid1", "name": "rec1.ts-test.example.com", "content": "1.2.3.4", "type": "A"}]
     mock_cf_api.get_all_managed_records.return_value = records_to_delete
-    
+
     sync.cleanup_cloudflare_records(mock_cf_api, dry_run=True)
-    
+
     mock_cf_api.delete_dns_record.assert_not_called()
     assert "DRY RUN mode enabled" in caplog.text
     assert "Planned to delete: 1 records. Errors: 0." in caplog.text
@@ -273,20 +275,21 @@ def test_cleanup_cloudflare_records_delete_error(mock_cf_api, caplog):
 def test_validate_api_tokens_all_ok(MockCfApiCons, MockTsApiCons, caplog):
     mock_ts_instance = MockTsApiCons.return_value
     mock_ts_instance.get_devices.return_value = [{"name": "test", "ip": "1.1.1.1"}] # Simulate successful call
-    
+
     mock_cf_instance = MockCfApiCons.return_value
     mock_cf_instance.get_dns_records.return_value = [] # Simulate successful call
 
     config = {
-        "tailscale": {"api_token": "ts_ok", "tailnet": "ok.com"},
+        "tailscale": {"comment": "No API token needed"},
         "cloudflare": {"api_token": "cf_ok", "zone_id": "zone_ok", "domain": "ok.com", "subdomain_prefix": "ts"}
     }
     sync.validate_api_tokens(config)
-    
-    assert "Tailscale API token and connectivity: OK" in caplog.text
+
+    assert "Tailscale CLI connectivity: OK" in caplog.text
     assert "Cloudflare API token and connectivity: OK" in caplog.text
     assert "All API validations passed." in caplog.text
-    MockTsApiCons.assert_called_once_with(api_token="ts_ok", tailnet="ok.com")
+    # No parameters passed to TailscaleAPI constructor anymore
+    MockTsApiCons.assert_called_once_with()
     MockCfApiCons.assert_called_once_with(api_token="cf_ok", zone_id="zone_ok", domain="ok.com", subdomain_prefix="ts")
 
 @patch('src.sync.TailscaleAPI')
@@ -294,14 +297,14 @@ def test_validate_api_tokens_all_ok(MockCfApiCons, MockTsApiCons, caplog):
 def test_validate_api_tokens_ts_fails(MockCfApiCons, MockTsApiCons, caplog):
     MockTsApiCons.return_value.get_devices.side_effect = ValueError("TS Auth Error")
     MockCfApiCons.return_value.get_dns_records.return_value = []
-    
+
     config = {
-        "tailscale": {"api_token": "ts_fail"},
+        "tailscale": {"comment": "No API token needed"},
         "cloudflare": {"api_token": "cf_ok", "zone_id": "zone_ok", "domain": "ok.com", "subdomain_prefix": "ts"}
     }
     sync.validate_api_tokens(config)
-    
-    assert "Tailscale API validation failed: TS Auth Error" in caplog.text
+
+    assert "Tailscale CLI validation failed: TS Auth Error" in caplog.text
     assert "Cloudflare API token and connectivity: OK" in caplog.text # CF should still be checked
     assert "One or more API validations failed." in caplog.text
 
@@ -312,12 +315,12 @@ def test_validate_api_tokens_cf_fails(MockCfApiCons, MockTsApiCons, caplog):
     MockCfApiCons.return_value.get_dns_records.side_effect = ValueError("CF Auth Error")
 
     config = {
-        "tailscale": {"api_token": "ts_ok"},
+        "tailscale": {"comment": "No API token needed"},
         "cloudflare": {"api_token": "cf_fail", "zone_id": "zone_fail", "domain": "fail.com", "subdomain_prefix": "ts"}
     }
     sync.validate_api_tokens(config)
 
-    assert "Tailscale API token and connectivity: OK" in caplog.text
+    assert "Tailscale CLI connectivity: OK" in caplog.text
     assert "Cloudflare API validation failed: CF Auth Error" in caplog.text
     assert "One or more API validations failed." in caplog.text
 
@@ -338,9 +341,9 @@ def test_main_single_run(mock_sync_dns, MockCfApi, MockTsApi, mock_setup_logging
         "sync": {"log_level": "INFO", "interval_seconds": 300}
     }
     monkeypatch.setattr(sys, 'argv', ['sync.py']) # Basic run, no extra args
-    
+
     sync.main()
-    
+
     mock_load_config.assert_called_once()
     mock_setup_logging.assert_called_once_with("INFO")
     MockTsApi.assert_called_once()
@@ -359,11 +362,11 @@ def test_main_list_devices(mock_list_dev, MockCfApi, MockTsApi, mock_setup_loggi
         "sync": {"log_level": "INFO"}
     }
     monkeypatch.setattr(sys, 'argv', ['sync.py', '--list-devices'])
-    
+
     with pytest.raises(SystemExit) as e: # Should exit after listing
         sync.main()
     assert e.value.code == 0
-    
+
     mock_list_dev.assert_called_once_with(MockTsApi.return_value)
 
 @patch('src.sync.load_config')
@@ -377,29 +380,6 @@ def test_main_validate_config(mock_validate, mock_setup_logging, mock_load_confi
         sync.main()
     assert e.value.code == 0
     mock_validate.assert_called_once_with(mock_load_config.return_value)
-
-
-@patch('src.sync.load_config')
-@patch('src.sync.setup_logging')
-@patch('src.sync.TailscaleAPI')
-@patch('src.sync.CloudflareAPI')
-@patch('src.sync.synchronize_dns')
-@patch('time.sleep', side_effect=InterruptedError) # To break the watch loop
-def test_main_watch_mode(mock_sleep, mock_sync_dns, MockCfApi, MockTsApi, mock_setup_logging, mock_load_config, monkeypatch, caplog):
-    config = {
-        "tailscale": {"api_token": "t", "tailnet": "tn"},
-        "cloudflare": {"api_token": "c", "zone_id": "z", "domain": "d", "subdomain_prefix": "p"},
-        "sync": {"log_level": "INFO", "interval_seconds": 1} # Short interval for test
-    }
-    mock_load_config.return_value = config
-    monkeypatch.setattr(sys, 'argv', ['sync.py', '--watch'])
-
-    with pytest.raises(InterruptedError): # Expect loop to be broken by mock_sleep
-        sync.main()
-    
-    assert mock_sync_dns.call_count >= 1 # Should run at least once
-    assert "Watch mode enabled. Synchronizing every 1 seconds." in caplog.text
-    mock_sleep.assert_called_with(1)
 
 
 def test_main_config_load_failure(monkeypatch, caplog):
