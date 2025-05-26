@@ -9,7 +9,7 @@ venv/
 ENV/
 
 # IDEs and editors
-.vscode/
+# .vscode/
 .idea/
 *.swp
 *.swo
