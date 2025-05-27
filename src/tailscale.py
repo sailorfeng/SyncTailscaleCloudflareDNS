@@ -94,13 +94,17 @@ class TailscaleAPI:
                         break
 
                 if ipv4_address:
+                    # Extract real hostname from FQDN if available
+                    fqdn = device.get("DNSName", "")
+                    real_hostname = fqdn.split(".")[0] if fqdn else device.get("HostName", "unknown")
                     active_devices.append({
                         "id": device_id,
                         "name": device.get("HostName", "unknown"),  # Short hostname
-                        "fqdn": device.get("DNSName", ""),  # FQDN from Tailscale
+                        "fqdn": fqdn,  # FQDN from Tailscale
                         "ip": ipv4_address,
                         "os": device.get("OS", "unknown"),
-                        "lastSeen": device.get("LastSeen", "")
+                        "lastSeen": device.get("LastSeen", ""),
+                        "real_hostname": real_hostname
                     })
                 else:
                     logger.debug(f"Device {device.get('HostName', 'UnknownDevice')} has no suitable IPv4 address. Addresses: {device.get('TailscaleIPs')}. Skipping.")
@@ -115,13 +119,16 @@ class TailscaleAPI:
                         break
 
                 if local_ipv4:
+                    fqdn = self_data.get("DNSName", "")
+                    real_hostname = fqdn.split(".")[0] if fqdn else self_data.get("HostName", "unknown")
                     active_devices.append({
                         "id": self_data.get("ID", ""),
                         "name": self_data.get("HostName", "unknown"),
-                        "fqdn": self_data.get("DNSName", ""),
+                        "fqdn": fqdn,
                         "ip": local_ipv4,
                         "os": self_data.get("OS", "unknown"),
-                        "lastSeen": "current"  # Local device is always "current"
+                        "lastSeen": "current",  # Local device is always "current"
+                        "real_hostname": real_hostname
                     })
                 else:
                     logger.debug(f"Local device has no suitable IPv4 address. Addresses: {self_data.get('TailscaleIPs')}. Skipping.")

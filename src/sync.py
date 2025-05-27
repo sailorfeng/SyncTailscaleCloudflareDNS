@@ -41,7 +41,8 @@ def get_desired_dns_records(ts_devices: List[Dict[str, Any]], cf_api: Cloudflare
     """
     desired_records = {}
     for device in ts_devices:
-        device_name = device.get("name") # This is the hostname
+        # Use real_hostname if available, otherwise fallback to name
+        device_name = device.get("real_hostname") or device.get("name")
         ip = device.get("ip")
         if device_name and ip:
             fqdn = cf_api._get_record_name(device_name) # Use internal method to ensure consistent naming
